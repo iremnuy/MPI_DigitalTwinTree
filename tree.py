@@ -16,34 +16,14 @@ def read_input_file(filename):
     return lines
 
 # Function to perform operations for each node
-def perform_node_operations(node_info, product,num_children):
-    print("performing node operations for machine",node_info["machine_id"])
-    # Extract relevant information from node_info dictionary
-    machine_id = node_info["machine_id"]
-    parent_id = node_info["parent_id"]
-    initial_operation = node_info["initial_operation"]
-    operations = node_info["operations"]
-
-    # Perform some dummy operation for demonstration
-
-    result = f"Result from machine {machine_id}"
-    #for real result perform the current operation without adding,leaf nodes do not add 
-
-    # Send the result back to the parent node, if not the root node
-    if machine_id != 1:
-        comm.send((result, machine_id), dest=parent_id)
-
-    # Receive a result from a child node, if not a leaf node
-    if machine_id not in leaf_nodes:
-        for _ in range(num_children[machine_id]):
-            result, child_id = comm.recv(source=MPI.ANY_SOURCE) #from any source (NOT FROM MASTER)
-            print(f"Machine {machine_id} received result from machine {child_id}: {result}")
-            #PERFORM THE OPERATION 
-            #take each child result first add them with add function then perform the current opertion for this node
-
-            # Send the result to the parent node, if not the root node
-            if machine_id != 1:
-                comm.send((result, machine_id), dest=parent_id)
+def perform_node_operations(node_info, product):
+    #NOTES
+    #Take the threshold,calculate the weariness,do the current operation and update the index for next call
+    #for leaf nodes do not add
+    #for non leaf nodes add
+    #each node has operations list and an index value for current operation
+    return
+    
 
 # Master process
 num_children = {}  
@@ -146,12 +126,4 @@ else:
     
         # Leaf nodes do something specific
         # ...
-    
-    
-    #print("else block parent")
-    # Receive information from the master process
-    #node_info, product = comm.recv(source = 1) #take message from child 
-    #print("non leaf node info",node_info,"non-leaf child is ",node_info["machine_id"])
-    # Non-leaf nodes do something specific
-    # ...
-    #node_info, product = comm.recv(source=MPI.ANY_SOURCE)    
+      
