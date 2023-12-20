@@ -16,14 +16,17 @@ def read_input_file(filename):
     return lines
 
 # Function to perform operations for each node
-def perform_node_operations(node_info, product):
+def perform_node_operations(node_info, product,num_children):
     # Extract relevant information from node_info dictionary
     machine_id = node_info["machine_id"]
     parent_id = node_info["parent_id"]
     initial_operation = node_info["initial_operation"]
+    operations = node_info["operations"]
 
     # Perform some dummy operation for demonstration
+
     result = f"Result from machine {machine_id}"
+    #for real result perform the current operation without adding,leaf nodes do not add 
 
     # Send the result back to the parent node, if not the root node
     if machine_id != 1:
@@ -35,12 +38,14 @@ def perform_node_operations(node_info, product):
             result, child_id = comm.recv(source=MPI.ANY_SOURCE) #from any source (NOT FROM MASTER)
             print(f"Machine {machine_id} received result from machine {child_id}: {result}")
             #PERFORM THE OPERATION 
+            #take each child result first add them with add function then perform the current opertion for this node
 
             # Send the result to the parent node, if not the root node
             if machine_id != 1:
                 comm.send((result, machine_id), dest=parent_id)
 
 # Master process
+num_children = {}                
 if rank == MASTER:
     # Read and process the input file
     input_lines = read_input_file("input.txt")
@@ -60,18 +65,22 @@ if rank == MASTER:
     num_children = {i: 0 for i in range(1, num_machines + 1)}
     for child, parent, operation_name in child_parent_relationships:
         parent_set.add(parent)
+        operations=[]
+        if (child % 2 == 0) :
+            operations : ["enhance","split","chop"]
+
+        else :
+            operations : ["trim","reverse"]
+            
         node_info[child] = {
             "machine_id": child,
             "parent_id": parent,
             "initial_operation": operation_name,
+            "operations": operations
+            }
             # Add any other relevant information
-            if (child % 2 == 0) :
-                "operations" : ["add", "enhance","split"],
-            else :
-             "operations" : ["add", "trim","reverse"]
             
-        }
-        num_children[parent] += 1
+        num_children[parent] += 1 #index i holds the number of children of node i
 
     # Determine leaf nodes (machines without parents)
     leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set)
@@ -95,4 +104,4 @@ else:
     node_info, product = comm.recv(source=MASTER) #from master process to worker process
 
     # Perform operations for each node
-    perform_node_operations(node_info, product) #Each leaf node initates its own chain of flow 
+    perform_node_operations(node_info, product,num_children) #Each leaf node initates its own chain of flow 
