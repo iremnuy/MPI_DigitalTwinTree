@@ -17,6 +17,7 @@ def read_input_file(filename):
 
 # Function to perform operations for each node
 def perform_node_operations(node_info, product,num_children):
+    print("performing node operations for machine",node_info["machine_id"])
     # Extract relevant information from node_info dictionary
     machine_id = node_info["machine_id"]
     parent_id = node_info["parent_id"]
@@ -107,30 +108,49 @@ if rank == MASTER:
     i=1
     for leaf_id, product in zip(leaf_nodes, products):
         # Send worker_info and product to the corresponding worker process
-        print("sending to",leaf_id,"size i.e process number is",size)
-        comm.send((node_info[leaf_id], product), dest=1)
+        print("sending to",leaf_id,"size i.e process number is",size,"this is i",i)
+        comm.send((node_info[leaf_id], product), dest=i)
         i+=1
 
 
     # Receive the final result from the root node (ID 1)
-    final_result, _ = comm.recv(source=1)
-    print("Final Result:", final_result)
+    #final_result, _ = comm.recv(source=1)
+    #print("Final Result:", final_result)
 
 # Worker processes
 else:
-
-    if rank in leaf_nodes:
+    print("else block worker")
+    print("leaf nodes",leaf_nodes)
     # Receive information from the master process
-        node_info, product = comm.recv(source=0) #from master process to worker process
+    i=rank
+    node_info, product = comm.recv(source=MASTER) #from master process to worker process
+    print("node info",node_info,"product",product,"leaf child is ",node_info["machine_id"])
+    result = f"Result from machine {node_info['machine_id']}"
+    print("size is",size)
 
+    node_info, product = comm.recv(source=i)
+    print("Cnode info taken from child",node_info,"product",product,"leaf child is ",node_info["machine_id"])
+    
+    #for real result perform the current operation without adding,leaf nodes do not add 
+
+    # Send the result back to the parent node, if not the root node
+    if node_info["machine_id"] != 1:
+        parent_id=node_info["parent_id"]
+        product=node_info["initial_operation"]
+        comm.send((parent_id, product), dest=i)   
     # Perform operations for each node
-        perform_node_operations(node_info, product,num_children) #Each 
+        #perform_node_operations(node_info, product,num_children) #Each 
 
     # Perform operations for each node
     
         # Leaf nodes do something specific
         # ...
-    else:
-        # Non-leaf nodes do something specific
-        # ...
-        node_info, product = comm.recv(source=MPI.ANY_SOURCE)    
+    
+    
+    #print("else block parent")
+    # Receive information from the master process
+    #node_info, product = comm.recv(source = 1) #take message from child 
+    #print("non leaf node info",node_info,"non-leaf child is ",node_info["machine_id"])
+    # Non-leaf nodes do something specific
+    # ...
+    #node_info, product = comm.recv(source=MPI.ANY_SOURCE)    
