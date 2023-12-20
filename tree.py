@@ -109,7 +109,7 @@ if rank == MASTER:
     for leaf_id, product in zip(leaf_nodes, products):
         # Send worker_info and product to the corresponding worker process
         print("sending to",leaf_id,"size i.e process number is",size,"this is i",i)
-        comm.send((node_info[leaf_id], product), dest=i)
+        comm.send((node_info[leaf_id], product,node_info), dest=i) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
         i+=1
 
 
@@ -123,21 +123,22 @@ else:
     print("leaf nodes",leaf_nodes)
     # Receive information from the master process
     i=rank
-    node_info, product = comm.recv(source=MASTER) #from master process to worker process
+    node_info, product,node_list = comm.recv(source=MASTER) #from master process to worker process
     print("node info",node_info,"product",product,"leaf child is ",node_info["machine_id"])
     result = f"Result from machine {node_info['machine_id']}"
-    print("size is",size)
-
-    node_info, product = comm.recv(source=i)
-    print("Cnode info taken from child",node_info,"product",product,"leaf child is ",node_info["machine_id"])
-    
     #for real result perform the current operation without adding,leaf nodes do not add 
 
     # Send the result back to the parent node, if not the root node
+
     if node_info["machine_id"] != 1:
         parent_id=node_info["parent_id"]
-        product=node_info["initial_operation"]
-        comm.send((parent_id, product), dest=i)   
+        comm.send((parent_id,node_list), dest=i)   #node list yani tüm liste 
+
+
+    parent_id,node_list= comm.recv(source=i)
+    parent_info=node_list[parent_id]
+    print("Cnode info taken from child my id is ",parent_info["machine_id"],"my parent is",parent_info["parent_id"],"initial operation is",parent_info["initial_operation"])
+    # Non-leaf nodes do something specific
     # Perform operations for each node
         #perform_node_operations(node_info, product,num_children) #Each 
 
