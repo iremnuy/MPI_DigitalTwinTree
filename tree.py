@@ -45,7 +45,8 @@ def perform_node_operations(node_info, product,num_children):
                 comm.send((result, machine_id), dest=parent_id)
 
 # Master process
-num_children = {}                
+num_children = {}  
+leaf_nodes = []              
 if rank == MASTER:
     # Read and process the input file
     input_lines = read_input_file("input.txt")
@@ -57,42 +58,59 @@ if rank == MASTER:
     maintenance_threshold = int(input_lines[3])
 
     # Process child-parent relationships to identify leaf nodes
-    child_parent_relationships = [list(map(int, line.split())) for line in input_lines[4:num_machines+2]]
+    child_parent_relationships = [list(map(str, line.split())) for line in input_lines[4:num_machines+3]]
     parent_set = set()
 
     # Initialize worker information for each leaf node
     node_info = {}
     num_children = {i: 0 for i in range(1, num_machines + 1)}
     for child, parent, operation_name in child_parent_relationships:
+        parent=int(parent)
+        child=int(child)
         parent_set.add(parent)
         operations=[]
+        print("this is child",child,"this is parent",parent)
         if (child % 2 == 0) :
-            operations : ["enhance","split","chop"]
+            operations =["enhance","split","chop"]
+            mod=3
 
         else :
-            operations : ["trim","reverse"]
-            
+            operations = ["trim","reverse"]
+            mod=2
+
         node_info[child] = {
             "machine_id": child,
             "parent_id": parent,
             "initial_operation": operation_name,
-            "operations": operations
+            "operations": operations,
+            "modulo": mod
             }
             # Add any other relevant information
+        #find initial opration index in the operations 
+        print(operations)
+        current_op_index=operations.index(operation_name)
+        #ADD NODE_INFO THE CURRENT OPERATION INDEX
+        node_info[child]["current_op_number"]=current_op_index
             
         num_children[parent] += 1 #index i holds the number of children of node i
 
     # Determine leaf nodes (machines without parents)
     leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set)
+    print("leaf nodes",leaf_nodes)
 
     # Extract initial product names
     num_leaf_machines = len(leaf_nodes)
-    products = input_lines[num_machines+3:num_machines+3+num_leaf_machines-1] # Assuming line number is the same as num_leaf_machines
+    products = input_lines[num_machines+3:num_machines+3+num_leaf_machines] # Assuming line number is the same as num_leaf_machines
+    print("products",products)
 
     # Distribute necessary information to worker processes
+    i=1
     for leaf_id, product in zip(leaf_nodes, products):
         # Send worker_info and product to the corresponding worker process
-        comm.send((node_info[leaf_id], product), dest=leaf_id)
+        print("sending to",leaf_id,"size i.e process number is",size)
+        comm.send((node_info[leaf_id], product), dest=1)
+        i+=1
+
 
     # Receive the final result from the root node (ID 1)
     final_result, _ = comm.recv(source=1)
@@ -100,8 +118,19 @@ if rank == MASTER:
 
 # Worker processes
 else:
+
+    if rank in leaf_nodes:
     # Receive information from the master process
-    node_info, product = comm.recv(source=MASTER) #from master process to worker process
+        node_info, product = comm.recv(source=0) #from master process to worker process
 
     # Perform operations for each node
-    perform_node_operations(node_info, product,num_children) #Each leaf node initates its own chain of flow 
+        perform_node_operations(node_info, product,num_children) #Each 
+
+    # Perform operations for each node
+    
+        # Leaf nodes do something specific
+        # ...
+    else:
+        # Non-leaf nodes do something specific
+        # ...
+        node_info, product = comm.recv(source=MPI.ANY_SOURCE)    
