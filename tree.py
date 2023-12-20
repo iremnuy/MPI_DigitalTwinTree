@@ -7,7 +7,7 @@ size = comm.Get_size()
 
 MASTER = 0
 
-# Function to read and process input file
+# Function to read and process the input file
 def read_input_file(filename):
     with open(filename, 'r') as file:
         # Read the lines from the file and remove leading/trailing whitespaces
@@ -15,10 +15,30 @@ def read_input_file(filename):
 
     return lines
 
-# Function to spawn worker processes
-def spawn_worker_processes(num_processes):
-    # Use MPI_COMM_SPAWN to spawn worker processes
-    # ...
+# Function to perform operations for each node
+def perform_node_operations(node_info, product):
+    # Extract relevant information from node_info dictionary
+    machine_id = node_info["machine_id"]
+    parent_id = node_info["parent_id"]
+    initial_operation = node_info["initial_operation"]
+
+    # Perform some dummy operation for demonstration
+    result = f"Result from machine {machine_id}"
+
+    # Send the result back to the parent node, if not the root node
+    if machine_id != 1:
+        comm.send((result, machine_id), dest=parent_id)
+
+    # Receive a result from a child node, if not a leaf node
+    if machine_id not in leaf_nodes:
+        for _ in range(num_children[machine_id]):
+            result, child_id = comm.recv(source=MPI.ANY_SOURCE) #from any source (NOT FROM MASTER)
+            print(f"Machine {machine_id} received result from machine {child_id}: {result}")
+            #PERFORM THE OPERATION 
+
+            # Send the result to the parent node, if not the root node
+            if machine_id != 1:
+                comm.send((result, machine_id), dest=parent_id)
 
 # Master process
 if rank == MASTER:
@@ -37,41 +57,42 @@ if rank == MASTER:
 
     # Initialize worker information for each leaf node
     node_info = {}
+    num_children = {i: 0 for i in range(1, num_machines + 1)}
     for child, parent, operation_name in child_parent_relationships:
         parent_set.add(parent)
         node_info[child] = {
             "machine_id": child,
+            "parent_id": parent,
             "initial_operation": operation_name,
             # Add any other relevant information
+            if (child % 2 == 0) :
+                "operations" : ["add", "enhance","split"],
+            else :
+             "operations" : ["add", "trim","reverse"]
+            
         }
+        num_children[parent] += 1
 
     # Determine leaf nodes (machines without parents)
     leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set)
 
     # Extract initial product names
-    products = input_lines[num_machines+2:num_machines+2+num_leaf_machines] # Assuming line number is the same as num_leaf_machines
-
-    # Spawn worker processes (one for each leaf machine)
     num_leaf_machines = len(leaf_nodes)
-    spawn_worker_processes(num_leaf_machines)
+    products = input_lines[num_machines+3:num_machines+3+num_leaf_machines-1] # Assuming line number is the same as num_leaf_machines
 
     # Distribute necessary information to worker processes
-    for leaf_id in leaf_nodes:
-        # Send worker_info to the corresponding worker process
-        comm.send(node_info[leaf_id], dest=leaf_id)
+    for leaf_id, product in zip(leaf_nodes, products):
+        # Send worker_info and product to the corresponding worker process
+        comm.send((node_info[leaf_id], product), dest=leaf_id)
+
+    # Receive the final result from the root node (ID 1)
+    final_result, _ = comm.recv(source=1)
+    print("Final Result:", final_result)
 
 # Worker processes
 else:
-    # Initiate the machine node, receive information from the master process
-    m_info = comm.recv(source=MASTER)
+    # Receive information from the master process
+    node_info, product = comm.recv(source=MASTER) #from master process to worker process
 
-    # Extract relevant information from m_info dictionary
-    machine_id = m_info["machine_id"]
-    initial_operation = m_info["initial_operation"]
-    # Extract any other relevant information
-
-    # Perform operations based on the received information
-    # ...
-
-# Finalize MPI
-MPI.Finalize()
+    # Perform operations for each node
+    perform_node_operations(node_info, product) #Each leaf node initates its own chain of flow 
