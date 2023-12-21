@@ -14,16 +14,41 @@ def read_input_file(filename):
         lines = [line.strip() for line in file.readlines()]
 
     return lines
-
+def add_children_strings():
+    #add strings in order of increasing child id
+    return
+    
 # Function to perform operations for each node
 def calculate_string(product, operation, mod):
     print("calculate string this is the product",product,"this is the operation",operation,"this is the mod",mod)
     #NOTES
     #Take the threshold,calculate the weariness,do the current operation and update the index for next call
-    #for leaf nodes do not add
-    #for non leaf nodes add
+    #if the threshold is exceeded,send the result to the parent node
+    if operation == "enhance":
+        #duplciate the first and last letters
+        product = product[0] + product + product[-1]
+    elif operation == "reverse":   
+        product = product[::-1]
+    elif operation == "chop":
+        if (len(product) >1):
+            product = product[:-1]
+    elif operation == "trim":
+        if (len(product) >2):
+             product = product[1:-1]
+    elif operation == "split":
+        length = len(product)
+        if length % 2 == 0:
+            split_point = length // 2
+        else:
+            split_point = (length + 1) // 2
+
+        product = product[:split_point]
+        print("split result",result)
+    else:
+        print("Invalid operation")
+    #current_op_index+=1
     #each node has operations list and an index value for current operation
-    return
+    return product
     
 # Master process
 num_children = {}  
@@ -64,7 +89,8 @@ if rank == MASTER:
             "parent_id": parent,
             "initial_operation": operation_name,
             "operations": operations,
-            "modulo": mod
+            "modulo": mod,
+            "children_product":{} #dictionary of children id and their results
             }
             # Add any other relevant information
         #find initial opration index in the operations 
@@ -74,6 +100,7 @@ if rank == MASTER:
         node_info[child]["current_op_number"]=current_op_index
             
         num_children[parent] += 1 #index i holds the number of children of node i
+        #node_info[parent]["children_product"]=[]
 
     # Determine leaf nodes (machines without parents)
     leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set)
@@ -89,7 +116,7 @@ if rank == MASTER:
     for leaf_id, product in zip(leaf_nodes, products):
         # Send worker_info and product to the corresponding worker process
         print("sending to",leaf_id,"size i.e process number is",size,"this is i",i)
-        comm.send((node_info[leaf_id], product,node_info,wear_factors), dest=i) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
+        comm.send((node_info[leaf_id], product,node_info,wear_factors),dest=i) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
         i+=1
 
 
@@ -113,27 +140,36 @@ else:
     wear_fac_index=wear_opname.index(operation_performed)
     wear_amount=wear_factors[wear_fac_index]
     result=calculate_string(product,operation_performed,mod)
-
+    print("this is result from leaf calcul",result)
     # Send the result back to the parent node, if not the root node
-
     if node_info["machine_id"] != 1:
         parent_id=node_info["parent_id"]
-        comm.send((parent_id,node_list,result), dest=i)   #nsend the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
+        #first all the children will send their results to their parents initally 5,6,7
+        comm.send((parent_id,node_list,result,node_info["machine_id"]), dest=i)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
 
-
-    parent_id,node_list,result= comm.recv(source=i)
+    
+    #parent of 5 will not go on adding state until it receives all the results from its children
+    parent_id,node_list,result_of_child,children_id= comm.recv(source=i) #wait for all results to be received from all children
     parent_info=node_list[parent_id]
-    product=result
+    print("this is parent with id ",parent_id,"this is sent from child",result_of_child)
+    #CURRENT NEED : CONCATENATE ALL THE RESULTS COMING FROM CHILDREN IN INCREASING ORDER OF CHILD ID
+    ########
+    ########               ADD parent_info["children_product"] THE RESULT OF THE CHILDREN
+    ########               sort the list according to the child id
+    ########
+    parent_info["children_product"][children_id]=result_of_child
+    #continue on receiving results from children until all the children send their results
+
+    sorted_children_product = dict(sorted(parent_info["children_product"].items()))
+    concatenated_str=''.join(sorted_children_product.values())
+    print("concatenated str",concatenated_str)
     mod=parent_info["modulo"]
     operation_performed=parent_info["operations"][parent_info["current_op_number"]]
     wear_fac_index=wear_opname.index(operation_performed) #find the index of the operation name in the wear factors list
     wear_amount=wear_factors[wear_fac_index]
-
-    result=calculate_string(product,operation_performed,mod) #calculate the result arrange the index 
+    result=calculate_string(result_of_child,operation_performed,mod) #calculate the result arrange the index
 
     #create a for loop for the upper part that sends messages to the parent until the root parent is reached
-
-
-    print("Cnode info taken from child my id is ",parent_info["machine_id"],"my parent is",parent_info["parent_id"],"initial operation is",parent_info["initial_operation"])
+    print("Cnode info taken from child my id is ",parent_info["machine_id"],"my parent is",parent_info["parent_id"],"initial operation is",parent_info["initial_operation"],"result is",result)
    
       
