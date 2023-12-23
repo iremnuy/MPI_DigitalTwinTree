@@ -117,7 +117,8 @@ if rank == MASTER:
             comm.send((machine_id, initial_product, node_data), dest=node_id)
 
     # Collect results from worker processes
-    final_machine_id, final_result = comm.recv()
+    final_machine_id, final_result = comm.recv(source=1,tag=1)
+    print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {final_result}")
     #for i in range(1, size):
     #    if i <= len(leaf_nodes):
     #        result = comm.recv(source=i)
@@ -142,7 +143,7 @@ else:
     print(f"Worker {rank} - Received initial information - Machine ID: {machine_id}, local worker info: {node_info_local}")
 
     # Perform operations for the specified number of cycles
-    for cycle in range(num_cycles):
+    for cycle in range(1):
         # Only collect results from children if the initial product is None (not a leaf)
         if initial_product is not None:
             # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
@@ -155,10 +156,11 @@ else:
         else:
             # Receive results from children
             child_results = {}
-            print("LOOOKING FOR CHILD RESULTS")
+            print("LOOOKING FOR CHILD RESULTS cycle is ",cycle, "machine id is ", machine_id,"node info local", node_info_local)
             print("current children product", node_info_local["children_product"])
             for child_id in node_info_local["children_product"]:
-                (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id)
+                print("waiting for this child id ",child_id)
+                (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id) #1 buradan alamıyor 
                 child_results[child_id] = child_product
                 print(f"COLLECTING CHILDRENNNN Worker {rank} - Received result from Child {child_id}: {child_product}")
 
@@ -171,7 +173,7 @@ else:
             combined_result = "".join(child_results[key] for key in sorted(child_results.keys()))
 
             # Print the combined string
-            print(combined_result)
+            print("this is combined_result",combined_result)
         
 
 
@@ -179,7 +181,10 @@ else:
             current_product = calculate_string(combined_result, node_info_local["operations"][0], node_info_local["modulo"])
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][0]}, Result: {current_product}")
             
-            # Send the result to the parent process
+            # Send the result to the parent process 
+            #burada en son 2. node 1 e gönderiyor bu esnada 1 bunu alıp mastera yollamalı 
+            print("calculated string is being sent to parent with id: ", node_info_local["parent_id"])
+            #dest=1 2.node için 
             comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
             print("INTERMEDIATE NODE SENDING THIS", (machine_id, current_product))
 
@@ -187,8 +192,8 @@ else:
             print("this is machine", machine_id, "my children have sent me a result", combined_result)
             
     # Inform the master process that the worker has completed its tasks
-    print(f"Worker {rank} - Completed all cycles. Sending completion signal to Master.")
-    comm.send((machine_id, current_product), dest=MASTER)
+    print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
+    comm.send((node_info_local["parent_id"], current_product), dest=MASTER,tag=1)
 
 
 
