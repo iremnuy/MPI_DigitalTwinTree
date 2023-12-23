@@ -84,6 +84,7 @@ child_parent_operations = [list(map(str, line.split())) for line in input_lines[
 
 # Initialize worker information for each leaf node
 node_info = {}
+general_cycle_result=[]
 child_dict_of_root={}
 num_children = {i: 0 for i in range(1, num_machines + 1)}
 parent_set = set()
@@ -141,68 +142,72 @@ print("leaf nodes", leaf_nodes)
 num_leaf_machines = len(leaf_nodes)
 products = input_lines[num_machines + 3:num_machines + 3 + num_leaf_machines]  # Assuming line number is the same as num_leaf_machines
 print("products", products)
-if rank == MASTER:
-    #must receive non-blocking weariness message 
-    # Receive maintenance information from workers
-    maintenance_info = []
-    #for i in range(1, size):  #receive maintenance info from all workers
-     #   print("received info from worker with id ", i)
-      #  maintenance_info.append(comm.irecv(source=i, tag=MAINTENANCE_TAG))
+while (num_cycles > 0):
+
+    print("cycle number", num_cycles)
+    num_cycles -= 1
+
+    if rank == MASTER:
+        #must receive non-blocking weariness message 
+        # Receive maintenance information from workers
+        #maintenance_info = []
+        #for i in range(1, size):  #receive maintenance info from all workers
+        #   print("received info from worker with id ", i)
+        #maintenance_info.append(comm.irecv(source=MPI.ANY_SOURCE, tag=MAINTENANCE_TAG))
+            
+        # Distribute necessary information to worker processes
+        #WHILE LOOP SUGGESTİON 
+        #if cycle number is not zero go on 
         
-    # Distribute necessary information to worker processes
+            for i in range(1, size): #send leaves blocking 
+                if i <= len(leaf_nodes):
+                    machine_id = leaf_nodes[i - 1]
+                    initial_product = products[i - 1]
+                    print(f"Sending initial information to worker {leaf_nodes[i - 1]} - Machine ID: {machine_id}, node info: {node_info[machine_id]}")
+                    comm.send((machine_id, initial_product, node_info[machine_id]), dest=leaf_nodes[i - 1])
 
-    #WHILE LOOP SUGGESTİON 
+            # Identify and distribute information to the remaining non-leaf nodes
+            for node_id, node_data in node_info.items():
+                if node_id not in leaf_nodes:
+                    machine_id = node_id
+                    initial_product = None  # Adjust as needed
+                    print(f"Sending initial information to worker for non-leaf node {node_id} - Machine ID: {machine_id}, node info: {node_data}")
+                    comm.send((machine_id, initial_product, node_data), dest=node_id)
 
+            final_result_list=[]
+            # Collect results from worker processes
+            final_machine_id, final_result= comm.recv(source=1,tag=1) #node info ekledim
+            print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {final_result}")
+            #for i in range(1, num_cycles):
+            #   final_machine_id, result = comm.recv(source=1,tag=1) #her bir cycle için final result bekleniyor 
+            #   print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {result}")
+            #   final_result_list.append(result) #ya da her birini geldikçe outputa yazdır 
+            #   print("final result list but not yet completed ", final_result_list)
 
-    for i in range(1, size): #send leaves blocking 
-        if i <= len(leaf_nodes):
-            machine_id = leaf_nodes[i - 1]
-            initial_product = products[i - 1]
-            print(f"Sending initial information to worker {leaf_nodes[i - 1]} - Machine ID: {machine_id}, node info: {node_info[machine_id]}")
-            comm.send((machine_id, initial_product, node_info[machine_id]), dest=leaf_nodes[i - 1])
+            #    if i <= len(leaf_nodes):
+            #        result = comm.recv(source=i)
+            #        if result is not None:
+            #            machine_id, result = result
+            #            print(f"Received result from worker {i} - Machine ID: {machine_id}, Result: {result}")
+            #            final_result += result  # Accumulate the result
+            #        else:
+            #            print(f"Received completion signal from worker {i}")
+            print("Final Result :", final_result)
+            #continue with next cycle HOW???
+            #bunu aldıktan sonra diğer cyclelara devam etmesi lazım 
 
-    # Identify and distribute information to the remaining non-leaf nodes
-    for node_id, node_data in node_info.items():
-        if node_id not in leaf_nodes:
-            machine_id = node_id
-            initial_product = None  # Adjust as needed
-            print(f"Sending initial information to worker for non-leaf node {node_id} - Machine ID: {machine_id}, node info: {node_data}")
-            comm.send((machine_id, initial_product, node_data), dest=node_id)
-    final_result_list=[]
-    # Collect results from worker processes
-    #final_machine_id, final_result = comm.recv(source=1,tag=1)
-    #print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {final_result}")
-    for i in range(1, num_cycles):
-        final_machine_id, result = comm.recv(source=1,tag=1) #her bir cycle için final result bekleniyor 
-        print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {result}")
-        final_result_list.append(result) #ya da her birini geldikçe outputa yazdır 
-        print("final result list but not yet completed ", final_result_list)
+            # Additional processing after all workers have completed
+            # ...
 
-    #    if i <= len(leaf_nodes):
-    #        result = comm.recv(source=i)
-    #        if result is not None:
-    #            machine_id, result = result
-    #            print(f"Received result from worker {i} - Machine ID: {machine_id}, Result: {result}")
-    #            final_result += result  # Accumulate the result
-    #        else:
-    #            print(f"Received completion signal from worker {i}")
-    print("Final Result:", final_result_list)
-    #bunu aldıktan sonra diğer cyclelara devam etmesi lazım 
+    # Worker processes
+    else:
+        # Receive information from master process
+        machine_id, initial_product, node_info_local = comm.recv(source=MASTER)
+        print(f"Worker {rank} - Received initial information - Machine ID: {machine_id}, local worker info: {node_info_local}")
 
-    # Additional processing after all workers have completed
-    # ...
-
-# Worker processes
-else:
-    # Receive information from master process
-    machine_id, initial_product, node_info_local = comm.recv(source=MASTER)
-    print(f"Worker {rank} - Received initial information - Machine ID: {machine_id}, local worker info: {node_info_local}")
-
-    # Perform operations for the specified number of cycles
-    while num_cycles > 0:
-        num_cycles-=1
-        for cycle in range(1): 
-            print("remaining cycles", num_cycles)
+        # Perform operations for the specified number of cycles
+        for cycle in range(1):
+            print("cycle no", cycle)
             # Only collect results from children if the initial product is None (not a leaf)
             if initial_product is not None:
                 # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
@@ -254,10 +259,15 @@ else:
 
                 combined_string = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_product"]])
                 print("this is machine", machine_id, "my children have sent me a result", combined_result)
-            
-        # Inform the master process that the worker has completed its tasks
-        print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
-        comm.send((machine_id, current_product), dest=MASTER,tag=1)
+                if machine_id == 1:
+                    general_cycle_result.append(combined_result)
+                    print("this is general cycle result", general_cycle_result)
+
+
+                #cycle lardan biri bitti kalınan yerden devam edilmeli leaflerden başlayarak    
+                # Inform the master process that the worker has completed its tasks
+        print(f"Worker {rank} - COMPLETED one of the cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
+        comm.send((machine_id, general_cycle_result), dest=MASTER,tag=1)
 
 
 
