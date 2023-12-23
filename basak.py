@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import struct
 
 # MPI initialization
 comm = MPI.COMM_WORLD
@@ -85,7 +86,6 @@ child_parent_operations = [list(map(str, line.split())) for line in input_lines[
 
 # Initialize worker information for each leaf node
 node_info = {}
-general_cycle_result=[]
 child_dict_of_root={}
 num_children = {i: 0 for i in range(1, num_machines + 1)}
 parent_set = set()
@@ -150,10 +150,13 @@ file_name = "output.txt"
 with open(file_name, 'w'):
     pass  # This block will just truncate the file
 
+#tag for a wearout log is 11111 
+wearout_logs = []
 
 if rank == MASTER:
 
     for cycle_step in range(num_cycles):
+
         # Distribute necessary information to worker processes
         for i in range(1, size):
             if i <= len(leaf_nodes):
@@ -186,7 +189,34 @@ if rank == MASTER:
         with open(file_name, 'a') as file:
             # Append the content of final_result to the file
             file.write(final_result + "\n")  # Add a newline if needed
+            if (cycle_step == num_cycles-1): #we are at the last stpe therefore we can log our wearouts
+                for item in wearout_logs:
+                    file.write(f"{item}\n")
         cycle+=1
+        # Check for the special continue loop message from any worker
+        for i in range(1, num_machines):
+            # Receive message with tag 999999
+            msg = comm.recv(source=i, tag=999999, status=MPI.Status())   
+
+        for i in range(1, num_machines):
+            status = MPI.Status()
+            # Prepare a buffer to receive the data
+            buf = bytearray(3 * MPI.INT.Get_size())  # Adjust the size based on your data type
+
+            # Non-blocking receive
+            req_recv = comm.Irecv(buf, source=i, tag=22222)
+
+            # Unpack the received data using struct.unpack (assuming 3 integers in this example)
+            received_data = struct.unpack('iii', buf)
+            # Unpack received data
+            machine_id, cost, cycle_step = received_data
+            # Create kebab case string
+            kebab_case_report = f"{machine_id}-{cost}-{cycle_step}"
+            # Store the kebab case string in the list
+            wearout_logs.append(kebab_case_report)
+
+
+
 
 # Worker processes
 else:
@@ -199,11 +229,22 @@ else:
 
         # Only collect results from children if the initial product is None (not a leaf)
         if initial_product is not None:
+            # Perform the current operation on the combined result
+
+            #initial operation is
+            initial_operation_name = node_info_local["initial_operation"]
+            #operation list is
+            operations_list = node_info_local["operations"]
+            #mode is
+            mod = len(operations_list)
+            #get the initial index 
+            index_of_initial_operation = operations_list.index(initial_operation_name)
+            #calculate current operation index
+            new_op_index= (index_of_initial_operation + cycle_step)%mod
             # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
-            op_index=node_info_local["current_op_number"]
-            op_index=(op_index+cycle_step)%node_info_local["modulo"]
-            current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"],cycle_step+1,machine_id)
-            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
+            #op_index=node_info_local["current_op_number"]
+            current_product = calculate_string(initial_product, node_info_local["operations"][new_op_index], node_info_local["modulo"])
+            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][new_op_index]}, Result: {current_product}")
             node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
             # Send the result to the parent process
             comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
@@ -235,23 +276,46 @@ else:
 
             # Perform the current operation on the combined result
 
-            #mode is
-            mod = node_info_local["modulo"]
             #initial operation is
             initial_operation_name = node_info_local["initial_operation"]
             #operation list is
             operations_list = node_info_local["operations"]
+            #mode is
+            mod = len(operations_list)
             #get the initial index 
             index_of_initial_operation = operations_list.index(initial_operation_name)
             #calculate current operation index
             new_op_index= (index_of_initial_operation + cycle_step)%mod
-
-            current_product = calculate_string(combined_result, node_info_local["operations"][new_op_index],mod,cycle_step+1,machine_id)
+            current_product = calculate_string(combined_result, node_info_local["operations"][new_op_index],mod)
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][new_op_index]}, Result: {current_product}")
             #node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
             
-            # Send the result to the parent process 
+            #WEAROUT CALCULATION with tag 22222
+            cost = 0
+
+            #YAPILACAKLAR#################################################
+            #cost calculation if accumulated wear >= threshold
+
+            #C = (A − T + 1) ∗ W F, A ≥ T
+
+
+
+            ##############################################################
+
+
+            # Assuming machine_id, cost, and cycle_step are integers
+            data = (machine_id, cost, cycle_step)
+
+            # Pack the data into a bytes-like object using struct.pack
+            packed_data = struct.pack('iii', *data)
+
+            # Use Isend with the packed data
+            req_send = comm.Isend(packed_data, dest=MASTER, tag=22222)
+
             
+            ##############################################################
+            
+            # Send the result to the parent process             
             print("calculated string is being sent to parent with id: ", node_info_local["parent_id"])
             #dest=1 2.node için 
             comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
@@ -263,7 +327,9 @@ else:
             if machine_id == 1:
                 comm.send((machine_id, combined_result), dest= MASTER, tag = 1)
 
-                
+        #special continue loop message
+        comm.send("hihi",dest= MASTER, tag = 999999)    
+
         # Inform the master process that the worker has completed its tasks
         #print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
         #comm.send((machine_id, current_product), dest=MASTER,tag=1)
