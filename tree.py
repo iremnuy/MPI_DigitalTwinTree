@@ -116,21 +116,23 @@ if rank == MASTER:
     for leaf_id, product in zip(leaf_nodes, products):
         # Send worker_info and product to the corresponding worker process
         print("sending to",leaf_id,"size i.e process number is",size,"this is i",i)
-        comm.send((node_info[leaf_id], product,node_info,wear_factors),dest=i) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
+        num_children_of_parent=num_children[node_info[leaf_id]["parent_id"]]
+        comm.send((node_info[leaf_id], product,node_info,wear_factors,num_children_of_parent),dest=i) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
         i+=1
 
 
     # Receive the final result from the root node (ID 1)
-    #final_result, _ = comm.recv(source=1)
-    #print("Final Result:", final_result)
-
+        
+    final_result = comm.recv(source=MPI.ANY_SOURCE,tag=1)
+    print("Final Result:", final_result)
 # Worker processes
 else:
+    print(num_children)
     print("else block worker")
     print("leaf nodes",leaf_nodes)
     # Receive information from the master process
     i=rank
-    node_info, product,node_list,wear_factors = comm.recv(source=MASTER) #from master process to worker process
+    node_info, product,node_list,wear_factors,num_children_of_parent = comm.recv(source=MASTER) #from master process to worker process
     print("node info",node_info,"product",product,"leaf child is ",node_info["machine_id"])
     result = f"Result from machine {node_info['machine_id']}"
     #for real result perform the current operation without adding,leaf nodes do not add 
@@ -149,26 +151,43 @@ else:
         if node_info["machine_id"] != 1:
             parent_id=node_info["parent_id"]
             #first all the children will send their results to their parents initally 5,6,7
-            comm.send((parent_id,node_list,result,node_info["machine_id"]), dest=i,tag=parent_id)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
+            comm.send((parent_id,node_list,result,node_info["machine_id"],num_children_of_parent), dest=i,tag=parent_id)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
 
         
         #parent of 5 will not go on adding state until it receives all the results from its children
         print("this is parent id before receiving",parent_id)  
-        parent_id,node_list,result_of_child,children_id= comm.recv(source=MPI.ANY_SOURCE,tag=parent_id) #wait for all results to be received from all children
-        print("this is parent id after receiving",parent_id)
+        #probe the messages with the tag of parent id,store the results in a dictionary with child id as key or in a buffer
+        #USE NUMBER OF CHILDREN TO DETERMINE HOW MANY RESULTS WILL BE RECEIVED
+        children_product={}
+
         if parent_id==1:
-            print("this is result from root this must be sent to the master process here ",result_of_child)
-            #comm.send(result_of_child,dest=MASTER)
+            print("this is result from root this must be sent to the master process here ",result_of_child,"this is rank:",rank,"this is i :",i)
+            comm.send(result_of_child,dest=MASTER,tag=1)
             break
-        parent_info=node_list[parent_id]
-        print("this is parent with id ",parent_id,"this is sent from child",result_of_child)
+       
+
+
+
+        for j in range (num_children_of_parent):  
+            parent_id,node_list,result_of_child,children_id,num_children_of_parent= comm.recv(source=MPI.ANY_SOURCE,tag=parent_id) #wait for all results to be received from all children
+            print("this is parent id after receiving",parent_id 
+                  ,"received this product",result_of_child,"from child",children_id,"number of children of parent",num_children_of_parent)
+            #store the results in a dictionary with child id as key or in a buffer  
+            parent_info=node_list[parent_id]
+            parent_info["children_product"][children_id]=result_of_child
+            children_product[children_id]=result_of_child
+            
+
+        print("this is parent with id ",parent_id,"this is sent from children so far ",children_product)
+        print("this is parent with id ",parent_id,"this is sent from children sooo far in list ",parent_info["children_product"])
         #Level of parallelism decreases as message is passed from many children to one parent
         #CURRENT NEED : CONCATENATE ALL THE RESULTS COMING FROM CHILDREN IN INCREASING ORDER OF CHILD ID
-        ########
-        ########               ADD parent_info["children_product"] THE RESULT OF THE CHILDREN
-        ########               sort the list according to the child id
-        ########
-        parent_info["children_product"][children_id]=result_of_child
+        ########  store this child rsults it must retain the results of all the children
+        ######## 
+        #parent_info["children_product"][children_id]=result_of_child
+        #children_product[children_id]=result_of_child
+        #print("children product",parent_info["children_product"])
+        #print("children product second",children_product)
         #continue on receiving results from children until all the children send their results
 
         sorted_children_product = dict(sorted(parent_info["children_product"].items()))
