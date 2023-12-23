@@ -61,7 +61,7 @@ def calculate_string(product, operation, mod):
 
         # Send maintenance cost to main control room using non-blocking communication
         maintenance_info = f"{machine_id}-{maintenance_cost}-{cycle + 1}"
-        comm.isend(maintenance_info, dest=MASTER, tag=MAINTENANCE_TAG)
+        comm.isend(maintenance_info, dest=MASTER, tag=MAINTENANCE_TAG) # Send maintenance info to master process non-blocking
 
         # Reset accumulated wear after maintenance
         node_info_local["accumulated_wear"] = 0
@@ -142,8 +142,19 @@ num_leaf_machines = len(leaf_nodes)
 products = input_lines[num_machines + 3:num_machines + 3 + num_leaf_machines]  # Assuming line number is the same as num_leaf_machines
 print("products", products)
 if rank == MASTER:
+    #must receive non-blocking weariness message 
+    # Receive maintenance information from workers
+    maintenance_info = []
+    #for i in range(1, size):  #receive maintenance info from all workers
+     #   print("received info from worker with id ", i)
+      #  maintenance_info.append(comm.irecv(source=i, tag=MAINTENANCE_TAG))
+        
     # Distribute necessary information to worker processes
-    for i in range(1, size):
+
+    #WHILE LOOP SUGGESTİON 
+
+
+    for i in range(1, size): #send leaves blocking 
         if i <= len(leaf_nodes):
             machine_id = leaf_nodes[i - 1]
             initial_product = products[i - 1]
@@ -157,11 +168,16 @@ if rank == MASTER:
             initial_product = None  # Adjust as needed
             print(f"Sending initial information to worker for non-leaf node {node_id} - Machine ID: {machine_id}, node info: {node_data}")
             comm.send((machine_id, initial_product, node_data), dest=node_id)
-
+    final_result_list=[]
     # Collect results from worker processes
-    final_machine_id, final_result = comm.recv(source=1,tag=1)
-    print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {final_result}")
-    #for i in range(1, size):
+    #final_machine_id, final_result = comm.recv(source=1,tag=1)
+    #print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {final_result}")
+    for i in range(1, num_cycles):
+        final_machine_id, result = comm.recv(source=1,tag=1) #her bir cycle için final result bekleniyor 
+        print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {result}")
+        final_result_list.append(result) #ya da her birini geldikçe outputa yazdır 
+        print("final result list but not yet completed ", final_result_list)
+
     #    if i <= len(leaf_nodes):
     #        result = comm.recv(source=i)
     #        if result is not None:
@@ -170,10 +186,8 @@ if rank == MASTER:
     #            final_result += result  # Accumulate the result
     #        else:
     #            print(f"Received completion signal from worker {i}")
-
-
-
-    print("Final Result:", final_result)
+    print("Final Result:", final_result_list)
+    #bunu aldıktan sonra diğer cyclelara devam etmesi lazım 
 
     # Additional processing after all workers have completed
     # ...
@@ -185,62 +199,65 @@ else:
     print(f"Worker {rank} - Received initial information - Machine ID: {machine_id}, local worker info: {node_info_local}")
 
     # Perform operations for the specified number of cycles
-    for cycle in range(1):
-        # Only collect results from children if the initial product is None (not a leaf)
-        if initial_product is not None:
-            # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
-            op_index=node_info_local["current_op_number"]
-            current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"])
-            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
-            node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
-            # Send the result to the parent process
-            comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
-            print("LEAF IS SENDING THIS", (machine_id, current_product))
-            comm.Barrier()
+    while num_cycles > 0:
+        num_cycles-=1
+        for cycle in range(1): 
+            print("remaining cycles", num_cycles)
+            # Only collect results from children if the initial product is None (not a leaf)
+            if initial_product is not None:
+                # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
+                op_index=node_info_local["current_op_number"]
+                current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"])
+                print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
+                node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
+                # Send the result to the parent process
+                comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
+                print("LEAF IS SENDING THIS", (machine_id, current_product))
+                comm.Barrier()
 
-        else:
-            # Receive results from children
-            child_results = {}
-            print("LOOOKING FOR CHILD RESULTS cycle is ",cycle, "machine id is ", machine_id,"node info local", node_info_local)
-            print("current children product", node_info_local["children_product"])
-            for child_id in node_info_local["children_product"]:
-                print("waiting for this child id ",child_id)
-                (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id) #1 buradan alamıyor 
-                child_results[child_id] = child_product
-                print(f"COLLECTING CHILDRENNNN Worker {rank} - Received result from Child {child_id}: {child_product}")
+            else:
+                # Receive results from children
+                child_results = {}
+                print("LOOOKING FOR CHILD RESULTS cycle is ",cycle, "machine id is ", machine_id,"node info local", node_info_local)
+                print("current children product", node_info_local["children_product"])
+                for child_id in node_info_local["children_product"]:
+                    print("waiting for this child id ",child_id)
+                    (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id) #1 buradan alamıyor 
+                    child_results[child_id] = child_product
+                    print(f"COLLECTING CHILDRENNNN Worker {rank} - Received result from Child {child_id}: {child_product}")
 
-            # Synchronize all processes before proceeding
-            # Combine results from specific children (concatenate strings)
-            #comm.Barrier() 
-            print("child results",child_results)
+                # Synchronize all processes before proceeding
+                # Combine results from specific children (concatenate strings)
+                #comm.Barrier() 
+                print("child results",child_results)
 
-            # Combine strings based on key order
-            combined_result = "".join(child_results[key] for key in sorted(child_results.keys()))
+                # Combine strings based on key order
+                combined_result = "".join(child_results[key] for key in sorted(child_results.keys()))
 
-            # Print the combined string
-            print("this is combined_result",combined_result)
-        
-
-
-            # Perform the current operation on the combined result
-            op_index=node_info_local["current_op_number"]
-            current_product = calculate_string(combined_result, node_info_local["operations"][op_index], node_info_local["modulo"])
-            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
-            node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
+                # Print the combined string
+                print("this is combined_result",combined_result)
             
-            # Send the result to the parent process 
-            #burada en son 2. node 1 e gönderiyor bu esnada 1 bunu alıp mastera yollamalı 
-            print("calculated string is being sent to parent with id: ", node_info_local["parent_id"])
-            #dest=1 2.node için 
-            comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
-            print("INTERMEDIATE NODE SENDING THIS", (machine_id, current_product))
 
-            combined_string = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_product"]])
-            print("this is machine", machine_id, "my children have sent me a result", combined_result)
+
+                # Perform the current operation on the combined result
+                op_index=node_info_local["current_op_number"]
+                current_product = calculate_string(combined_result, node_info_local["operations"][op_index], node_info_local["modulo"])
+                print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
+                node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
+                
+                # Send the result to the parent process 
+                #burada en son 2. node 1 e gönderiyor bu esnada 1 bunu alıp mastera yollamalı 
+                print("calculated string is being sent to parent with id: ", node_info_local["parent_id"])
+                #dest=1 2.node için 
+                comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
+                print("INTERMEDIATE NODE SENDING THIS", (machine_id, current_product))
+
+                combined_string = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_product"]])
+                print("this is machine", machine_id, "my children have sent me a result", combined_result)
             
-    # Inform the master process that the worker has completed its tasks
-    print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
-    comm.send((machine_id, current_product), dest=MASTER,tag=1)
+        # Inform the master process that the worker has completed its tasks
+        print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
+        comm.send((machine_id, current_product), dest=MASTER,tag=1)
 
 
 
