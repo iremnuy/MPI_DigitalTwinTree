@@ -35,6 +35,30 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 
+
+if rank == 0:
+    data = comm.recv(source = 1, tag = 1)
+    print(rank, data)
+    i=0
+    while i<3:
+        data = "root to leaf {i}"
+        comm.send(data, dest = 1, tag = 0)
+        print(rank, data)
+        i+=1
+
+else:
+    if rank==1:
+        data = comm.recv(source = 0, tag = 1)
+        print(rank, data)
+
+        data = "leaf to parent"
+        comm.send(data, dest = 2, tag = 0)
+        print(rank, data)
+    elif rank==2:
+        data = comm.recv(source = 1, tag = 0)
+        print(rank, data)
+
+        
 if rank == 0:
     print(f"I am the master, I have rank {rank}")
     print(f"There are {size} processes running")
@@ -75,22 +99,6 @@ else:
 
 
 
-
-if rank == 0:
-    data = comm.recv(source = 1, tag = 1)
-    print(rank, data)
-
-    data = "master2slave"
-    comm.send(data, dest = 1, tag = 0)
-    print(rank, data)
-
-else:
-    data = comm.recv(source = 0, tag = 1)
-    print(rank, data)
-
-    data = "slave2master"
-    comm.send(data, dest = 0, tag = 0)
-    print(rank, data)
 
 
 
