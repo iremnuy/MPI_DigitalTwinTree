@@ -194,6 +194,7 @@ else:
         if initial_product is not None:
             # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
             op_index=node_info_local["current_op_number"]
+            op_index=op_index+cycle_step%node_info_local["modulo"]
             current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"])
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
             node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
