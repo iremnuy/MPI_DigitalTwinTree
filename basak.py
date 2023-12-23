@@ -91,9 +91,17 @@ for child, parent, operation_name in child_parent_operations:
     parent = int(parent)
     child = int(child)
     parent_set.add(parent)
-    operations = [operation_name]
-    mod = 1  # Assuming one operation in the list
+    #operation name is the first opertion that the machine will initially perform
+    operations = []
+    if (child % 2 == 0) :
+            operations =["enhance","split","chop"]
+            mod=3 
 
+    else :
+            operations = ["trim","reverse"]
+            mod=2
+    current_op_index=operations.index(operation_name)
+    
     node_info[child] = {
         "machine_id": child,
         "parent_id": parent,
@@ -103,6 +111,7 @@ for child, parent, operation_name in child_parent_operations:
         "children_product": {} , # dictionary of children id and their results
         "accumulated_wear": 0
     }
+    node_info[child]["current_op_number"] = current_op_index #örneğin 4 numaralı child ın ilk op chop ise 2 olacak sonra number 1 arttırılıp 3 e göre modu alınacak 
     if parent == 1:
         child_dict_of_root[child]=1
         node_info[parent] = {
@@ -111,11 +120,12 @@ for child, parent, operation_name in child_parent_operations:
             "initial_operation": "special",
             "operations": ["special"],
             "modulo": 1,
-            "children_product": child_dict_of_root # dictionary of children id and their results
+            "children_product": child_dict_of_root ,  # dictionary of children id and their results
+            "current_op_number": 0 #önemsiz kullanılmıyor ama hata veriyor o yüzden
         }
     # find initial operation index in the operations
-    current_op_index = 0  # Index for the first operation in the list
-    node_info[child]["current_op_number"] = current_op_index
+    # Index for the first operation in the list
+    
 
     num_children[parent] += 1  # index i holds the number of children of node i
     
@@ -179,8 +189,11 @@ else:
         # Only collect results from children if the initial product is None (not a leaf)
         if initial_product is not None:
             # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
-            current_product = calculate_string(initial_product, node_info_local["operations"][0], node_info_local["modulo"])
-            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][0]}, Result: {current_product}")
+            op_index=node_info_local["current_op_number"]
+            current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"])
+            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
+            node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
+            # Send the result to the parent process
             comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
             print("LEAF IS SENDING THIS", (machine_id, current_product))
             comm.Barrier()
@@ -210,8 +223,10 @@ else:
 
 
             # Perform the current operation on the combined result
-            current_product = calculate_string(combined_result, node_info_local["operations"][0], node_info_local["modulo"])
-            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][0]}, Result: {current_product}")
+            op_index=node_info_local["current_op_number"]
+            current_product = calculate_string(combined_result, node_info_local["operations"][op_index], node_info_local["modulo"])
+            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
+            node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
             
             # Send the result to the parent process 
             #burada en son 2. node 1 e gönderiyor bu esnada 1 bunu alıp mastera yollamalı 
