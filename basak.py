@@ -20,6 +20,9 @@ def read_input_file(filename):
 # Function to perform operations for each node
 def calculate_string(product, operation, mod):
     print("calculate string this is the product", product, "this is the operation", operation, "this is the mod", mod)
+    if operation == "s":
+        print("special operation for root node")
+        return product
     # NOTES
     wear_factor_index=wear_opname.index(operation) 
     wear_factor=wear_factors[wear_factor_index]
@@ -81,6 +84,7 @@ child_parent_operations = [list(map(str, line.split())) for line in input_lines[
 
 # Initialize worker information for each leaf node
 node_info = {}
+child_dict_of_root={}
 num_children = {i: 0 for i in range(1, num_machines + 1)}
 parent_set = set()
 for child, parent, operation_name in child_parent_operations:
@@ -100,12 +104,14 @@ for child, parent, operation_name in child_parent_operations:
         "accumulated_wear": 0
     }
     if parent == 1:
+        child_dict_of_root[child]=1
         node_info[parent] = {
             "machine_id": 1,
             "parent_id": 0,
-            "initial_operation": None,
-            "operations": None,
-            "modulo": None
+            "initial_operation": "special",
+            "operations": "special",
+            "modulo": 1,
+            "children_product": child_dict_of_root # dictionary of children id and their results
         }
     # find initial operation index in the operations
     current_op_index = 0  # Index for the first operation in the list
