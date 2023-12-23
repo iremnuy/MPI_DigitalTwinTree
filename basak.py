@@ -99,14 +99,6 @@ print("leaf nodes", leaf_nodes)
 num_leaf_machines = len(leaf_nodes)
 products = input_lines[num_machines + 3:num_machines + 3 + num_leaf_machines]  # Assuming line number is the same as num_leaf_machines
 print("products", products)
-
-
-
-
-
-
-
-
 if rank == MASTER:
     # Distribute necessary information to worker processes
     for i in range(1, size):
@@ -164,6 +156,7 @@ else:
             # Receive results from children
             child_results = {}
             print("LOOOKING FOR CHILD RESULTS")
+            print("current children product", node_info_local["children_product"]")
             for child_id in node_info_local["children_product"]:
                 (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id)
                 child_results[child_id] = child_product
@@ -190,7 +183,7 @@ else:
             comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
             print("INTERMEDIATE NODE SENDING THIS", (machine_id, current_product))
 
-            combined_string = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_products"]])
+            combined_string = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_product"]])
             print("this is machine", machine_id, "my children have sent me a result", combined_result)
             
     # Inform the master process that the worker has completed its tasks
