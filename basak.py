@@ -20,7 +20,7 @@ def read_input_file(filename):
 # Function to perform operations for each node
 def calculate_string(product, operation, mod):
     print("calculate string this is the product", product, "this is the operation", operation, "this is the mod", mod)
-    if operation == "s":
+    if operation == "special":
         print("special operation for root node")
         return product
     # NOTES
@@ -109,7 +109,7 @@ for child, parent, operation_name in child_parent_operations:
             "machine_id": 1,
             "parent_id": 0,
             "initial_operation": "special",
-            "operations": "special",
+            "operations": ["special"],
             "modulo": 1,
             "children_product": child_dict_of_root # dictionary of children id and their results
         }
