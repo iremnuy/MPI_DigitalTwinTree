@@ -156,7 +156,7 @@ else:
             # Receive results from children
             child_results = {}
             print("LOOOKING FOR CHILD RESULTS")
-            print("current children product", node_info_local["children_product"]")
+            print("current children product", node_info_local["children_product"])
             for child_id in node_info_local["children_product"]:
                 (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id)
                 child_results[child_id] = child_product
