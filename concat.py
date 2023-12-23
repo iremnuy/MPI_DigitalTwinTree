@@ -103,7 +103,7 @@ if rank == MASTER:
         #node_info[parent]["children_product"]=[]
 
     # Determine leaf nodes (machines without parents)
-    leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set) #2den itibaren numaralandırılmış olduğunu varsayıyorum
+    leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set)
     print("leaf nodes",leaf_nodes)
 
     # Extract initial product names
@@ -117,7 +117,7 @@ if rank == MASTER:
         # Send worker_info and product to the corresponding worker process
         print("sending to",leaf_id,"size i.e process number is",size,"this is i",i)
         num_children_of_parent=num_children[node_info[leaf_id]["parent_id"]]
-        comm.send((node_info[leaf_id], product,node_info,wear_factors,num_children_of_parent),dest=i,tag=0) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
+        comm.send((node_info[leaf_id], product,node_info,wear_factors,num_children_of_parent),dest=1) #node info gönderdim haberlesme boyle cok yer kaplıyo sanırım ama baska türlü nasıl olucak ??????????
         i+=1
 
 
@@ -127,12 +127,11 @@ if rank == MASTER:
     print("Final Result:", final_result)
 # Worker processes
 else:
-    print(num_children)
-    print("else block worker")
+    print("else block worker this is rank : ",rank)
     print("leaf nodes",leaf_nodes)
     # Receive information from the master process
     i=rank
-    node_info, product,node_list,wear_factors,num_children_of_parent = comm.recv(source=MPI.ANY_SOURCE,tag=0) #from master process to worker process
+    node_info, product,node_list,wear_factors,num_children_of_parent = comm.recv(source=MASTER) # burası 1 processi from master process to worker process
     print("node info",node_info,"product",product,"leaf child is ",node_info["machine_id"])
     result = f"Result from machine {node_info['machine_id']}"
     #for real result perform the current operation without adding,leaf nodes do not add 
@@ -147,15 +146,11 @@ else:
 
     #Here initiate a for loop to continously send messages from children to their parents until the root node is 
     
-    while True:
+    while node_info["machine_id"] != 1:
         if node_info["machine_id"] != 1:
             parent_id=node_info["parent_id"]
             #first all the children will send their results to their parents initally 5,6,7
-            if parent_id==1:
-                comm.send(result,dest=MASTER,tag=1)
-                break
-            else:
-                comm.send((parent_id,node_list,result,node_info["machine_id"],num_children_of_parent), dest=i,tag=parent_id)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
+            comm.send((parent_id,node_list,result,node_info["machine_id"],num_children_of_parent), dest=2,tag=parent_id)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
 
         
         #parent of 5 will not go on adding state until it receives all the results from its children
@@ -163,16 +158,23 @@ else:
         #probe the messages with the tag of parent id,store the results in a dictionary with child id as key or in a buffer
         #USE NUMBER OF CHILDREN TO DETERMINE HOW MANY RESULTS WILL BE RECEIVED
         children_product={}
+
+        if parent_id==1:
+            print("this is result from root this must be sent to the master process here ",result_of_child,"this is rank:",rank,"this is i :",i)
+            comm.send(result_of_child,dest=MASTER,tag=1)
+            break
        
-        if parent_id!=1:
-        #for j in range (num_children_of_parent):  
-            parent_id,node_list,result_of_child,children_id,num_children_of_parent= comm.recv(source=MPI.ANY_SOURCE,tag=parent_id) #wait for all results to be received from all children
-        print("this is parent id after receiving",parent_id 
-        ,"received this product",result_of_child,"from child with id : ",children_id," and number of children of parent is",num_children_of_parent)
+
+
+
+        for j in range (num_children_of_parent):  
+            parent_id,node_list,result_of_child,children_id,num_children_of_parent= comm.recv(source=2,tag=parent_id) # burası process 2 //wait for all results to be received from all children
+            print("this is parent id after receiving",parent_id 
+                  ,"received this product",result_of_child,"from child",children_id,"number of children of parent",num_children_of_parent)
             #store the results in a dictionary with child id as key or in a buffer  
-        parent_info=node_list[parent_id]
-        parent_info["children_product"][children_id]=result_of_child
-        children_product[children_id]=result_of_child
+            parent_info=node_list[parent_id]
+            parent_info["children_product"][children_id]=result_of_child
+            children_product[children_id]=result_of_child
             
 
         print("this is parent with id ",parent_id,"this is sent from children so far ",children_product)
