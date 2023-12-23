@@ -7,6 +7,7 @@ size = comm.Get_size()
 wear_opname = ["enhance", "reverse", "chop", "trim", "split"]
 MASTER = 0
 
+
 # Function to read and process the input file
 def read_input_file(filename):
     with open(filename, 'r') as file:
@@ -85,6 +86,10 @@ for child, parent, operation_name in child_parent_operations:
     node_info[child]["current_op_number"] = current_op_index
 
     num_children[parent] += 1  # index i holds the number of children of node i
+    
+    if (int(parent)!= 1):
+        node_info[parent]["children_product"][child] = 1 
+
 
 # Determine leaf nodes (machines without parents)
 leaf_nodes = sorted(set(range(2, num_machines + 1)) - parent_set)
@@ -101,16 +106,15 @@ print("products", products)
 
 
 
-# Master process
-# Master process
+
 if rank == MASTER:
     # Distribute necessary information to worker processes
     for i in range(1, size):
         if i <= len(leaf_nodes):
             machine_id = leaf_nodes[i - 1]
             initial_product = products[i - 1]
-            print(f"Sending initial information to worker {i} - Machine ID: {machine_id}, node info: {node_info[machine_id]}")
-            comm.send((machine_id, initial_product, node_info[machine_id]), dest=i)
+            print(f"Sending initial information to worker {leaf_nodes[i - 1]} - Machine ID: {machine_id}, node info: {node_info[machine_id]}")
+            comm.send((machine_id, initial_product, node_info[machine_id]), dest=leaf_nodes[i - 1])
 
     # Identify and distribute information to the remaining non-leaf nodes
     for node_id, node_data in node_info.items():
@@ -122,15 +126,15 @@ if rank == MASTER:
 
     # Collect results from worker processes
     final_result = ""
-    for i in range(1, size):
-        if i <= len(leaf_nodes):
-            result = comm.recv(source=i)
-            if result is not None:
-                machine_id, result = result
-                print(f"Received result from worker {i} - Machine ID: {machine_id}, Result: {result}")
-                final_result += result  # Accumulate the result
-            else:
-                print(f"Received completion signal from worker {i}")
+    #for i in range(1, size):
+    #    if i <= len(leaf_nodes):
+    #        result = comm.recv(source=i)
+    #        if result is not None:
+    #            machine_id, result = result
+    #            print(f"Received result from worker {i} - Machine ID: {machine_id}, Result: {result}")
+    #            final_result += result  # Accumulate the result
+    #        else:
+    #            print(f"Received completion signal from worker {i}")
 
 
 
@@ -152,22 +156,31 @@ else:
             # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
             current_product = calculate_string(initial_product, node_info_local["operations"][0], node_info_local["modulo"])
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][0]}, Result: {current_product}")
-            comm.send((machine_id, current_product), dest=node_info_local["parent_id"])
+            comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
+            print("LEAF IS SENDING THIS", (machine_id, current_product))
             comm.Barrier()
 
         else:
             # Receive results from children
             child_results = {}
+            print("LOOOKING FOR CHILD RESULTS")
             for child_id in node_info_local["children_product"]:
-                result = comm.recv(source=child_id)
-                comm.Barrier()
-                child_results[child_id] = result
-                print(f"Worker {rank} - Received result from Child {child_id}: {result}")
+                (sender_child, child_product) = comm.recv(source=child_id, tag = machine_id)
+                child_results[child_id] = child_product
+                print(f"COLLECTING CHILDRENNNN Worker {rank} - Received result from Child {child_id}: {child_product}")
 
             # Synchronize all processes before proceeding
-
             # Combine results from specific children (concatenate strings)
-            combined_result = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children"]])
+            #comm.Barrier() 
+            print("child results",child_results)
+
+            # Combine strings based on key order
+            combined_result = "".join(child_results[key] for key in sorted(child_results.keys()))
+
+            # Print the combined string
+            print(combined_result)
+
+            combined_result = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_products"]])
             print("this is machine", machine_id, "my children have sent me a result", combined_result)
 
             # Perform the current operation on the combined result
