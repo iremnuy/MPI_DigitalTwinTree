@@ -125,7 +125,7 @@ if rank == MASTER:
             comm.send((machine_id, initial_product, node_data), dest=node_id)
 
     # Collect results from worker processes
-    final_result = ""
+    final_machine_id, final_result = comm.recv()
     #for i in range(1, size):
     #    if i <= len(leaf_nodes):
     #        result = comm.recv(source=i)
@@ -179,21 +179,23 @@ else:
 
             # Print the combined string
             print(combined_result)
+        
 
-            combined_result = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_products"]])
-            print("this is machine", machine_id, "my children have sent me a result", combined_result)
 
             # Perform the current operation on the combined result
             current_product = calculate_string(combined_result, node_info_local["operations"][0], node_info_local["modulo"])
-            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][0]}, Combined Result: {combined_result}, Result: {current_product}")
-
+            print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][0]}, Result: {current_product}")
+            
             # Send the result to the parent process
-            print(f"Worker {rank} - Cycle {cycle + 1} - Sending result to Parent (ID: {node_info_local['parent_id']}) - Result: {current_product}")
-            comm.send((machine_id, current_product), dest=node_info_local["parent_id"])
+            comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
+            print("INTERMEDIATE NODE SENDING THIS", (machine_id, current_product))
 
+            combined_string = "".join([child_results[child_id] for child_id in sorted(child_results.keys()) if child_id in node_info_local["children_products"]])
+            print("this is machine", machine_id, "my children have sent me a result", combined_result)
+            
     # Inform the master process that the worker has completed its tasks
     print(f"Worker {rank} - Completed all cycles. Sending completion signal to Master.")
-    comm.send((machine_id, ""), dest=MASTER)
+    comm.send((machine_id, current_product), dest=MASTER)
 
 
 
