@@ -142,34 +142,46 @@ else:
     result=calculate_string(product,operation_performed,mod)
     print("this is result from leaf calcul",result)
     # Send the result back to the parent node, if not the root node
-    if node_info["machine_id"] != 1:
-        parent_id=node_info["parent_id"]
-        #first all the children will send their results to their parents initally 5,6,7
-        comm.send((parent_id,node_list,result,node_info["machine_id"]), dest=i)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
 
+    #Here initiate a for loop to continously send messages from children to their parents until the root node is 
     
-    #parent of 5 will not go on adding state until it receives all the results from its children
-    parent_id,node_list,result_of_child,children_id= comm.recv(source=i) #wait for all results to be received from all children
-    parent_info=node_list[parent_id]
-    print("this is parent with id ",parent_id,"this is sent from child",result_of_child)
-    #CURRENT NEED : CONCATENATE ALL THE RESULTS COMING FROM CHILDREN IN INCREASING ORDER OF CHILD ID
-    ########
-    ########               ADD parent_info["children_product"] THE RESULT OF THE CHILDREN
-    ########               sort the list according to the child id
-    ########
-    parent_info["children_product"][children_id]=result_of_child
-    #continue on receiving results from children until all the children send their results
+    while node_info["machine_id"] != 1:
+        if node_info["machine_id"] != 1:
+            parent_id=node_info["parent_id"]
+            #first all the children will send their results to their parents initally 5,6,7
+            comm.send((parent_id,node_list,result,node_info["machine_id"]), dest=i,tag=parent_id)   #send the result to parent,it will also calculate its own result and will send it to its own parent until it reaches the root node
 
-    sorted_children_product = dict(sorted(parent_info["children_product"].items()))
-    concatenated_str=''.join(sorted_children_product.values())
-    print("concatenated str",concatenated_str)
-    mod=parent_info["modulo"]
-    operation_performed=parent_info["operations"][parent_info["current_op_number"]]
-    wear_fac_index=wear_opname.index(operation_performed) #find the index of the operation name in the wear factors list
-    wear_amount=wear_factors[wear_fac_index]
-    result=calculate_string(result_of_child,operation_performed,mod) #calculate the result arrange the index
+        
+        #parent of 5 will not go on adding state until it receives all the results from its children
+        print("this is parent id before receiving",parent_id)  
+        parent_id,node_list,result_of_child,children_id= comm.recv(source=MPI.ANY_SOURCE,tag=parent_id) #wait for all results to be received from all children
+        print("this is parent id after receiving",parent_id)
+        if parent_id==1:
+            print("this is result from root this must be sent to the master process here ",result_of_child)
+            #comm.send(result_of_child,dest=MASTER)
+            break
+        parent_info=node_list[parent_id]
+        print("this is parent with id ",parent_id,"this is sent from child",result_of_child)
+        #Level of parallelism decreases as message is passed from many children to one parent
+        #CURRENT NEED : CONCATENATE ALL THE RESULTS COMING FROM CHILDREN IN INCREASING ORDER OF CHILD ID
+        ########
+        ########               ADD parent_info["children_product"] THE RESULT OF THE CHILDREN
+        ########               sort the list according to the child id
+        ########
+        parent_info["children_product"][children_id]=result_of_child
+        #continue on receiving results from children until all the children send their results
 
-    #create a for loop for the upper part that sends messages to the parent until the root parent is reached
-    print("Cnode info taken from child my id is ",parent_info["machine_id"],"my parent is",parent_info["parent_id"],"initial operation is",parent_info["initial_operation"],"result is",result)
-   
+        sorted_children_product = dict(sorted(parent_info["children_product"].items()))
+        concatenated_str=''.join(sorted_children_product.values())
+        print("concatenated str",concatenated_str)
+        print("children product dict",parent_info["children_product"],"rank is ",rank,"size is",size,"parent id is",parent_id)
+        mod=parent_info["modulo"]
+        operation_performed=parent_info["operations"][parent_info["current_op_number"]]
+        wear_fac_index=wear_opname.index(operation_performed) #find the index of the operation name in the wear factors list
+        wear_amount=wear_factors[wear_fac_index]
+        result=calculate_string(result_of_child,operation_performed,mod) #calculate the result arrange the index
+
+        #create a for loop for the upper part that sends messages to the parent until the root parent is reached
+        print("Cnode info taken from child my id is ",parent_info["machine_id"],"my parent is",parent_info["parent_id"],"initial operation is",parent_info["initial_operation"],"result is",result)
+        node_info=parent_info
       
