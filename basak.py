@@ -193,7 +193,7 @@ else:
             
     # Inform the master process that the worker has completed its tasks
     print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
-    comm.send((node_info_local["parent_id"], current_product), dest=MASTER,tag=1)
+    comm.send((machine_id, current_product), dest=MASTER,tag=1)
 
 
 
