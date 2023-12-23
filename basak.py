@@ -99,7 +99,14 @@ for child, parent, operation_name in child_parent_operations:
         "children_product": {} , # dictionary of children id and their results
         "accumulated_wear": 0
     }
-
+    if parent == 1:
+        node_info[parent] = {
+            "machine_id": 1,
+            "parent_id": 0,
+            "initial_operation": None,
+            "operations": None,
+            "modulo": None
+        }
     # find initial operation index in the operations
     current_op_index = 0  # Index for the first operation in the list
     node_info[child]["current_op_number"] = current_op_index
