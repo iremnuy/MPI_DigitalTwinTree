@@ -6,7 +6,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 wear_opname = ["enhance", "reverse", "chop", "trim", "split"]
 MASTER = 0
-
+MAINTENANCE_TAG=555
 
 # Function to read and process the input file
 def read_input_file(filename):
@@ -21,11 +21,15 @@ def read_input_file(filename):
 def calculate_string(product, operation, mod):
     print("calculate string this is the product", product, "this is the operation", operation, "this is the mod", mod)
     # NOTES
+    wear_factor_index=wear_opname.index(operation) 
+    wear_factor=wear_factors[wear_factor_index]
     # Take the threshold, calculate the weariness, do the current operation and update the index for the next call
     # if the threshold is exceeded, send the result to the parent node
     if operation == "enhance":
         # duplicate the first and last letters
         product = product[0] + product + product[-1]
+        #wear_factor_index=wear_opname.index(operation) 
+        #wear_factor=wear_factors[wear_factor_index]
     elif operation == "reverse":
         product = product[::-1]
     elif operation == "chop":
@@ -44,6 +48,21 @@ def calculate_string(product, operation, mod):
         print("split result", product)
     else:
         print("Invalid operation")
+    node_info_local["accumulated_wear"] += wear_factor # Update accumulated wear
+
+    # Check if maintenance is needed
+    if node_info_local["accumulated_wear"] >= maintenance_threshold: 
+        # Calculate maintenance cost
+        print("weariness")
+        maintenance_cost = (node_info_local["accumulated_wear"] - maintenance_threshold + 1) * wear_factor
+
+        # Send maintenance cost to main control room using non-blocking communication
+        maintenance_info = f"{machine_id}-{maintenance_cost}-{cycle + 1}"
+        comm.isend(maintenance_info, dest=MASTER, tag=MAINTENANCE_TAG)
+
+        # Reset accumulated wear after maintenance
+        node_info_local["accumulated_wear"] = 0
+    
 
     print("OPERATION RESULT", product)
     return product
@@ -51,7 +70,6 @@ def calculate_string(product, operation, mod):
 
 # Read and process the input file
 input_lines = read_input_file("input.txt")
-
 # Extract relevant information from input_lines
 num_machines = int(input_lines[0])
 num_cycles = int(input_lines[1])
@@ -78,7 +96,8 @@ for child, parent, operation_name in child_parent_operations:
         "initial_operation": operation_name,
         "operations": operations,
         "modulo": mod,
-        "children_product": {}  # dictionary of children id and their results
+        "children_product": {} , # dictionary of children id and their results
+        "accumulated_wear": 0
     }
 
     # find initial operation index in the operations
