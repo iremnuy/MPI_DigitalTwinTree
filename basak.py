@@ -19,7 +19,7 @@ def read_input_file(filename):
 
 
 # Function to perform operations for each node
-def calculate_string(product, operation, mod):
+def calculate_string(product, operation, mod,cycle_num,machine_id):
     print("calculate string this is the product", product, "this is the operation", operation, "this is the mod", mod)
     if operation == "special":
         print("special operation for root node")
@@ -61,9 +61,9 @@ def calculate_string(product, operation, mod):
         maintenance_cost = (node_info_local["accumulated_wear"] - maintenance_threshold + 1) * wear_factor
 
         # Send maintenance cost to main control room using non-blocking communication
-        maintenance_info = f"{machine_id}-{maintenance_cost}-{cycle + 1}"
+        maintenance_info = f"{machine_id}-{maintenance_cost}-{cycle_num + 1}"
         comm.isend(maintenance_info, dest=MASTER, tag=MAINTENANCE_TAG)
-
+    
         # Reset accumulated wear after maintenance
         node_info_local["accumulated_wear"] = 0
     
@@ -169,8 +169,15 @@ if rank == MASTER:
                 initial_product = None  # Adjust as needed
                 print(f"Sending initial information to worker for non-leaf node {node_id} - Machine ID: {machine_id}, node info: {node_data}")
                 comm.send((machine_id, initial_product, node_data), dest=node_id)
-
-        # Collect results from 1
+        #receive possible weariness information from workers        
+        for i in range(1, size):
+            message=comm.irecv(source=i,tag=MAINTENANCE_TAG)      
+            if message.Test() == True:
+                print("meesage received") #write to file 
+            else:
+                print("not weary")   
+        
+        # Collect results from 1      
         final_machine_id, final_result = comm.recv(source=1,tag=1)
         print(f"Received result from worker {1} - Machine ID: {final_machine_id}, Result: {final_result}")
         print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Final Result:", final_result)
@@ -195,7 +202,7 @@ else:
             # If initial product is not None, directly perform the operation and send the result to the parent bc we are leaf
             op_index=node_info_local["current_op_number"]
             op_index=(op_index+cycle_step)%node_info_local["modulo"]
-            current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"])
+            current_product = calculate_string(initial_product, node_info_local["operations"][op_index], node_info_local["modulo"],cycle_step+1,machine_id)
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][op_index]}, Result: {current_product}")
             node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
             # Send the result to the parent process
@@ -239,7 +246,7 @@ else:
             #calculate current operation index
             new_op_index= (index_of_initial_operation + cycle_step)%mod
 
-            current_product = calculate_string(combined_result, node_info_local["operations"][new_op_index],mod)
+            current_product = calculate_string(combined_result, node_info_local["operations"][new_op_index],mod,cycle_step+1,machine_id)
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][new_op_index]}, Result: {current_product}")
             #node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
             
