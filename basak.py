@@ -77,7 +77,7 @@ def calculate_string(product, operation, mod,cycle_step,machine_id,accumulated_w
 
 
 # Read and process the input file
-input_lines = read_input_file("test_input.txt")
+input_lines = read_input_file("input.txt")
 # Extract relevant information from input_lines
 num_machines = int(input_lines[0])
 num_cycles = int(input_lines[1])
@@ -148,7 +148,7 @@ num_leaf_machines = len(leaf_nodes)
 products = input_lines[num_machines + 3:num_machines + 3 + num_leaf_machines]  # Assuming line number is the same as num_leaf_machines
 print("products", products)
 
-file_name = "test_output.txt"
+file_name = "output.txt"
 #empty the file
 # Open the file in write mode ('w') to empty it
 with open(file_name, 'w'):
@@ -212,7 +212,7 @@ if rank == MASTER:
             print("\n  *************************** MACHINE ID ", machine_id, "list size", len(accumulated_wear_list), received_data)
 
             if(machine_id <= num_machines):
-                accumulated_wear_list[machine_id]+=cost
+                accumulated_wear_list[machine_id] += cost
                 print("accumulated wear for machine id", machine_id, "is", accumulated_wear_list[machine_id])
                 if accumulated_wear_list[machine_id] >= maintenance_threshold:
                     print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step,"cost is",cost)
@@ -227,7 +227,8 @@ if rank == MASTER:
                         with open(file_name, 'a') as file:
                             # Append the content of final_result to the file
                             file.write(f"{kebab_case_report}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
-
+            else:
+                print("machine id is not valid", machine_id)
 
 # Worker processes
 else:
@@ -257,8 +258,6 @@ else:
             current_product,wear_offset = calculate_string(initial_product, node_info_local["operations"][new_op_index], node_info_local["modulo"],cycle_step+1,machine_id,node_info_local["accumulated_wear"])
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][new_op_index]}, Result: {current_product}")
             node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
-            node_info_local["accumulated_wear"] += wear_offset
-            print("acc wear after update",node_info_local["accumulated_wear"])
             # Send the result to the parent process
             comm.send((machine_id, current_product), dest=node_info_local["parent_id"], tag = node_info_local["parent_id"])
             print("LEAF IS SENDING THIS", (machine_id, current_product))
@@ -301,7 +300,6 @@ else:
             new_op_index= (index_of_initial_operation + cycle_step)%mod
             current_product,wear_offset = calculate_string(combined_result, node_info_local["operations"][new_op_index],mod,cycle_step+1,machine_id,node_info_local["accumulated_wear"])
             print(f"Worker {rank} - Cycle {cycle + 1} - Operation: {node_info_local['operations'][new_op_index]}, Result: {current_product}")
-            node_info_local["accumulated_wear"] += wear_offset # Update accumulated wear
             print("acc wear after update",node_info_local["accumulated_wear"])
             #node_info_local["current_op_number"] = (node_info_local["current_op_number"] + 1) % node_info_local["modulo"] # Update operation index for 
             #neden bunu yoruma aldıık 
