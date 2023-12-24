@@ -184,9 +184,9 @@ if rank == MASTER:
         with open(file_name, 'a') as file:
             # Append the content of final_result to the file
             file.write(final_result + "\n")  # Add a newline if needed
-            if (cycle_step == num_cycles-1): #we are at the last stpe therefore we can log our wearouts
+            if (cycle_step == num_cycles-1): #we are at the last stpe therefore we can log our wearouts//num_cycles-1 idi ona bir ekledim 
                 for item in wearout_logs:
-                    file.write(f"{item}\n")
+                    file.write(f"{item}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
         cycle+=1
         # Check for the special continue loop message from any worker
         for i in range(1, num_machines):
@@ -209,16 +209,24 @@ if rank == MASTER:
             accumulated_wear_list[machine_id]+=cost
             print("accumulated wear for machine id", machine_id, "is", accumulated_wear_list[machine_id])
             if accumulated_wear_list[machine_id] >= maintenance_threshold:
-                print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id])
+                print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step,"cost is",cost)
                 # Create kebab case string
                 machine_cost=(accumulated_wear_list[machine_id] - maintenance_threshold + 1) * cost
                 kebab_case_report = f"{machine_id}-{machine_cost}-{cycle_step}"
+                print("kebab case report is",kebab_case_report)
                 #Store the kebab case string in the list
                 wearout_logs.append(kebab_case_report)
-                # Reset accumulated wear after maintenance
                 accumulated_wear_list[machine_id] = 0
+                if cycle_step==num_cycles: 
+                     with open(file_name, 'a') as file:
+                        # Append the content of final_result to the file
+                        file.write(f"{kebab_case_report}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
+
+
+                # Reset accumulated wear after maintenance
+                
             #wearout_logs.append(req_recv)
-            
+    #tüm cycle bitti son bir kez wearout logları yazdır        
 
 
 
