@@ -190,6 +190,7 @@ if rank == MASTER:
             if (cycle_step == num_cycles-1): #we are at the last stpe therefore we can log our wearouts//num_cycles-1 idi ona bir ekledim 
                 for item in wearout_logs:
                     file.write(f"{item}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
+                    
         cycle+=1
         # Check for the special continue loop message from any worker
         for i in range(1, num_machines):
