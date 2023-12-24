@@ -74,7 +74,7 @@ def calculate_string(product, operation, mod,cycle_step,machine_id,accumulated_w
 
 
 # Read and process the input file
-input_lines = read_input_file("input.txt")
+input_lines = read_input_file("test_input.txt")
 # Extract relevant information from input_lines
 num_machines = int(input_lines[0])
 num_cycles = int(input_lines[1])
@@ -145,7 +145,7 @@ num_leaf_machines = len(leaf_nodes)
 products = input_lines[num_machines + 3:num_machines + 3 + num_leaf_machines]  # Assuming line number is the same as num_leaf_machines
 print("products", products)
 
-file_name = "output.txt"
+file_name = "test_output.txt"
 #empty the file
 # Open the file in write mode ('w') to empty it
 with open(file_name, 'w'):
