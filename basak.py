@@ -1,3 +1,4 @@
+import sys
 from mpi4py import MPI
 import struct
 
@@ -75,9 +76,17 @@ def calculate_string(product, operation, mod,cycle_step,machine_id,accumulated_w
     print("OPERATION RESULT ", product,"this is wear fac",wear_factor)
     return product,wear_factor
 
+if __name__ == "__main__":
+    # Check if the correct number of command-line arguments is provided
+    if len(sys.argv) != 3:
+        print("Usage: mpiexec -n 1 python yourcode.py input.txt output.txt")
+        sys.exit(1)
+
+    input_filename = sys.argv[1]
+    output_filename = sys.argv[2]
 
 # Read and process the input file
-input_lines = read_input_file("mock.txt") #instead take argumnts from command line
+input_lines = read_input_file(input_filename) #instead take argumnts from command line
 # Extract relevant information from input_lines
 num_machines = int(input_lines[0])
 num_cycles = int(input_lines[1])
@@ -148,7 +157,7 @@ num_leaf_machines = len(leaf_nodes)
 products = input_lines[num_machines + 3:num_machines + 3 + num_leaf_machines]  # Assuming line number is the same as num_leaf_machines
 print("products", products)
 
-file_name = "output.txt"
+file_name = output_filename
 #empty the file
 # Open the file in write mode ('w') to empty it
 with open(file_name, 'w'):
