@@ -208,22 +208,22 @@ if rank == MASTER:
             # Unpack the received data using struct.unpack (assuming 3 integers in this example)
             received_data = struct.unpack('iii', buf)
             # Unpack received data
-            machine_id, cost, cycle_step = received_data
+            machine_id, cost, cycle_step_received = received_data
             print("\n  *************************** MACHINE ID ", machine_id, "list size", len(accumulated_wear_list), received_data)
 
             if(machine_id <= num_machines):
                 accumulated_wear_list[machine_id] += cost
                 print("accumulated wear for machine id", machine_id, "is", accumulated_wear_list[machine_id])
                 if accumulated_wear_list[machine_id] >= maintenance_threshold:
-                    print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step,"cost is",cost)
+                    print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step_received,"cost is",cost)
                     # Create kebab case string
                     machine_cost=(accumulated_wear_list[machine_id] - maintenance_threshold + 1) * cost
-                    kebab_case_report = f"{machine_id}-{machine_cost}-{cycle_step}"
+                    kebab_case_report = f"{machine_id}-{machine_cost}-{cycle_step_received}"
                     print("kebab case report is",kebab_case_report)
                     #Store the kebab case string in the list
                     wearout_logs.append(kebab_case_report)
                     accumulated_wear_list[machine_id] = 0
-                    if cycle_step==num_cycles: 
+                    if cycle_step_received==num_cycles: 
                         with open(file_name, 'a') as file:
                             # Append the content of final_result to the file
                             file.write(f"{kebab_case_report}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
