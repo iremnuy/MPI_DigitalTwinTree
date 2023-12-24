@@ -27,6 +27,7 @@ def calculate_string(product, operation, mod,cycle_step,machine_id,accumulated_w
         #send dummy message for acc 
         data = (machine_id, 0, cycle_step) #root için beklemesin diye 
         packed_data = struct.pack('iii', *data)
+        print("\n &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&6 CS SENDS THE MACHINE ID", machine_id)
         comm.Isend(packed_data, dest=MASTER, tag=22222)
         return product,0
     # NOTES
@@ -59,13 +60,15 @@ def calculate_string(product, operation, mod,cycle_step,machine_id,accumulated_w
     else:
         print("Invalid operation")
         # Send maintenance cost to main control room using non-blocking communication
-         # Assuming machine_id, cost, and cycle_step are integers
+    
+    # Assuming machine_id, cost, and cycle_step are integers
     data = (machine_id, wear_factor, cycle_step) #buraya zaten girmeyecek hep tek seferlik wear factor geri gönderiypor mastera
 
             # Pack the data into a bytes-like object using struct.pack
     packed_data = struct.pack('iii', *data)
 
-            # Use Isend with the packed data
+    print("\n &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&6 CS SENDS THE MACHINE ID", machine_id)
+    # Use Isend with the packed data
     req_send = comm.Isend(packed_data, dest=MASTER, tag=22222)
     
 
@@ -206,28 +209,24 @@ if rank == MASTER:
             received_data = struct.unpack('iii', buf)
             # Unpack received data
             machine_id, cost, cycle_step = received_data
-            accumulated_wear_list[machine_id]+=cost
-            print("accumulated wear for machine id", machine_id, "is", accumulated_wear_list[machine_id])
-            if accumulated_wear_list[machine_id] >= maintenance_threshold:
-                print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step,"cost is",cost)
-                # Create kebab case string
-                machine_cost=(accumulated_wear_list[machine_id] - maintenance_threshold + 1) * cost
-                kebab_case_report = f"{machine_id}-{machine_cost}-{cycle_step}"
-                print("kebab case report is",kebab_case_report)
-                #Store the kebab case string in the list
-                wearout_logs.append(kebab_case_report)
-                accumulated_wear_list[machine_id] = 0
-                if cycle_step==num_cycles: 
-                     with open(file_name, 'a') as file:
-                        # Append the content of final_result to the file
-                        file.write(f"{kebab_case_report}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
+            print("\n  *************************** MACHINE ID ", machine_id, "list size", len(accumulated_wear_list), received_data)
 
-
-                # Reset accumulated wear after maintenance
-                
-            #wearout_logs.append(req_recv)
-    #tüm cycle bitti son bir kez wearout logları yazdır        
-
+            if(machine_id <= num_machines):
+                accumulated_wear_list[machine_id]+=cost
+                print("accumulated wear for machine id", machine_id, "is", accumulated_wear_list[machine_id])
+                if accumulated_wear_list[machine_id] >= maintenance_threshold:
+                    print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step,"cost is",cost)
+                    # Create kebab case string
+                    machine_cost=(accumulated_wear_list[machine_id] - maintenance_threshold + 1) * cost
+                    kebab_case_report = f"{machine_id}-{machine_cost}-{cycle_step}"
+                    print("kebab case report is",kebab_case_report)
+                    #Store the kebab case string in the list
+                    wearout_logs.append(kebab_case_report)
+                    accumulated_wear_list[machine_id] = 0
+                    if cycle_step==num_cycles: 
+                        with open(file_name, 'a') as file:
+                            # Append the content of final_result to the file
+                            file.write(f"{kebab_case_report}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
 
 
 # Worker processes
@@ -349,4 +348,3 @@ else:
         # Inform the master process that the worker has completed its tasks
         #print(f"Worker {rank} - COMPLETED all cycles. Sending completion signal to Master.This is the output of cycle {cycle}", current_product,"this is current machine :",machine_id,"this is my parent", node_info_local["parent_id"])
         #comm.send((machine_id, current_product), dest=MASTER,tag=1)
-
