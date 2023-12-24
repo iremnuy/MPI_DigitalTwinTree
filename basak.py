@@ -77,7 +77,7 @@ def calculate_string(product, operation, mod,cycle_step,machine_id,accumulated_w
 
 
 # Read and process the input file
-input_lines = read_input_file("input.txt")
+input_lines = read_input_file("mock.txt") #instead take argumnts from command line
 # Extract relevant information from input_lines
 num_machines = int(input_lines[0])
 num_cycles = int(input_lines[1])
@@ -190,7 +190,7 @@ if rank == MASTER:
             if (cycle_step == num_cycles-1): #we are at the last stpe therefore we can log our wearouts//num_cycles-1 idi ona bir ekledim 
                 for item in wearout_logs:
                     file.write(f"{item}\n") #son cycleda buraya tekrar dönmüyor oyüzden 2 4 10 yazılmıyo 
-                    
+
         cycle+=1
         # Check for the special continue loop message from any worker
         for i in range(1, num_machines):
@@ -218,6 +218,7 @@ if rank == MASTER:
                 if accumulated_wear_list[machine_id] >= maintenance_threshold:
                     print("maintenance is needed for machine id", machine_id,"because it is wearout is",accumulated_wear_list[machine_id],"this is cycle",cycle_step_received,"cost is",cost)
                     # Create kebab case string
+                    #print("cycle in master is :",cycle,"cycle step received is",cycle_step_received)
                     machine_cost=(accumulated_wear_list[machine_id] - maintenance_threshold + 1) * cost
                     kebab_case_report = f"{machine_id}-{machine_cost}-{cycle_step_received}"
                     print("kebab case report is",kebab_case_report)
